@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
 using PdfiumViewer;
-using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 
 namespace PDF_Editor
@@ -24,149 +23,134 @@ namespace PDF_Editor
 
         private void btnOpen_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog dlg = new OpenFileDialog())
+            using var dlg = new OpenFileDialog();
+            dlg.Filter = "PDF files (*.pdf)|*.pdf";
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                dlg.Filter = "PDF files (*.pdf)|*.pdf";
-                if (dlg.ShowDialog() == DialogResult.OK)
+                try
                 {
-                    try
-                    {
-                        pdfViewer.Document?.Dispose();
-                        pdfViewer.Document = PdfiumViewer.PdfDocument.Load(dlg.FileName);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Failed to open PDF: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+                    pdfViewer.Document?.Dispose();
+                    pdfViewer.Document = PdfDocument.Load(dlg.FileName);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Failed to open PDF: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
 
         private void btnSaveAs_Click(object sender, EventArgs e)
         {
-            using (SaveFileDialog dlg = new SaveFileDialog())
+            using var dlg = new SaveFileDialog();
+            dlg.Filter = "PDF files (*.pdf)|*.pdf";
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                dlg.Filter = "PDF files (*.pdf)|*.pdf";
-                if (dlg.ShowDialog() == DialogResult.OK)
+                var document = pdfViewer.Document;
+                if (document != null)
                 {
-                    var document = pdfViewer.Document;
-                    if (document != null)
+                    try
                     {
-                        try
-                        {
-                            document.Save(dlg.FileName);
-                            MessageBox.Show("PDF saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show("Failed to save PDF: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
+                        document.Save(dlg.FileName);
+                        MessageBox.Show("PDF saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        MessageBox.Show("No PDF is loaded to save.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show("Failed to save PDF: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
+                }
+                else
+                {
+                    MessageBox.Show("No PDF is loaded to save.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
         }
 
         private void btnMerge_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog dlg = new OpenFileDialog())
+            using var dlg = new OpenFileDialog();
+            dlg.Filter = "PDF files (*.pdf)|*.pdf";
+            dlg.Multiselect = true;
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                dlg.Filter = "PDF files (*.pdf)|*.pdf";
-                dlg.Multiselect = true;
-                if (dlg.ShowDialog() == DialogResult.OK)
+                try
                 {
-                    try
+                    var outputDocument = new PdfSharp.Pdf.PdfDocument();
+
+                    foreach (var file in dlg.FileNames)
                     {
-                        PdfSharp.Pdf.PdfDocument outputDocument = new PdfSharp.Pdf.PdfDocument();
-
-                        foreach (string file in dlg.FileNames)
+                        var inputDocument = PdfReader.Open(file, PdfDocumentOpenMode.Import);
+                        for (var idx = 0; idx < inputDocument.PageCount; idx++)
                         {
-                            PdfSharp.Pdf.PdfDocument inputDocument = PdfSharp.Pdf.IO.PdfReader.Open(file, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
-                            for (int idx = 0; idx < inputDocument.PageCount; idx++)
-                            {
-                                outputDocument.AddPage(inputDocument.Pages[idx]);
-                            }
-                        }
-
-                        using (SaveFileDialog saveDlg = new SaveFileDialog())
-                        {
-                            saveDlg.Filter = "PDF files (*.pdf)|*.pdf";
-                            if (saveDlg.ShowDialog() == DialogResult.OK)
-                            {
-                                outputDocument.Save(saveDlg.FileName);
-                                MessageBox.Show("PDFs merged successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                                // >>> Tambahan: Buka file hasil merge langsung
-                                pdfViewer.Document?.Dispose();
-                                pdfViewer.Document = PdfiumViewer.PdfDocument.Load(saveDlg.FileName);
-                            }
+                            outputDocument.AddPage(inputDocument.Pages[idx]);
                         }
                     }
-                    catch (Exception ex)
+
+                    using var saveDlg = new SaveFileDialog();
+                    saveDlg.Filter = "PDF files (*.pdf)|*.pdf";
+                    if (saveDlg.ShowDialog() == DialogResult.OK)
                     {
-                        MessageBox.Show("Failed to merge PDFs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        outputDocument.Save(saveDlg.FileName);
+                        MessageBox.Show("PDFs merged successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        // >>> Tambahan: Buka file hasil merge langsung
+                        pdfViewer.Document?.Dispose();
+                        pdfViewer.Document = PdfDocument.Load(saveDlg.FileName);
                     }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Failed to merge PDFs: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
 
         private void btnRotate_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog dlg = new OpenFileDialog())
+            using var dlg = new OpenFileDialog();
+            dlg.Filter = "PDF files (*.pdf)|*.pdf";
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                dlg.Filter = "PDF files (*.pdf)|*.pdf";
-                if (dlg.ShowDialog() == DialogResult.OK)
+                try
                 {
-                    try
+                    var inputDocument = PdfReader.Open(dlg.FileName, PdfDocumentOpenMode.Modify);
+
+                    var inputPage = Microsoft.VisualBasic.Interaction.InputBox(
+                        "Enter page number to rotate (1 - " + inputDocument.PageCount.ToString() + "):",
+                        "Rotate Page");
+
+                    if (int.TryParse(inputPage, out var pageNumber))
                     {
-                        // Buka dokumen PDF untuk di-modify
-                        PdfSharp.Pdf.PdfDocument inputDocument = PdfReader.Open(dlg.FileName, PdfDocumentOpenMode.Modify);
-
-                        // Minta input user halaman yang mau di-rotate
-                        string inputPage = Microsoft.VisualBasic.Interaction.InputBox(
-                            "Enter page number to rotate (1 - " + inputDocument.PageCount.ToString() + "):",
-                            "Rotate Page");
-
-                        int pageNumber;
-                        if (int.TryParse(inputPage, out pageNumber))
+                        if (pageNumber >= 1 && pageNumber <= inputDocument.PageCount)
                         {
-                            if (pageNumber >= 1 && pageNumber <= inputDocument.PageCount)
-                            {
-                                // Rotate halaman yang dipilih 90 derajat searah jarum jam
-                                PdfSharp.Pdf.PdfPage page = inputDocument.Pages[pageNumber - 1];
-                                page.Rotate = (page.Rotate + 90) % 360;
+                            // Rotate halaman yang dipilih 90 derajat searah jarum jam
+                            var page = inputDocument.Pages[pageNumber - 1];
+                            page.Rotate = (page.Rotate + 90) % 360;
 
-                                using (SaveFileDialog saveDlg = new SaveFileDialog())
-                                {
-                                    saveDlg.Filter = "PDF files (*.pdf)|*.pdf";
-                                    if (saveDlg.ShowDialog() == DialogResult.OK)
-                                    {
-                                        inputDocument.Save(saveDlg.FileName);
-                                        MessageBox.Show("Page rotated and file saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                                        // Reload file hasil rotasi ke viewer
-                                        pdfViewer.Document?.Dispose();
-                                        pdfViewer.Document = PdfiumViewer.PdfDocument.Load(saveDlg.FileName);
-                                    }
-                                }
-                            }
-                            else
+                            using var saveDlg = new SaveFileDialog();
+                            saveDlg.Filter = "PDF files (*.pdf)|*.pdf";
+                            if (saveDlg.ShowDialog() == DialogResult.OK)
                             {
-                                MessageBox.Show("Invalid page number.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                inputDocument.Save(saveDlg.FileName);
+                                MessageBox.Show("Page rotated and file saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                                // Reload file hasil rotasi ke viewer
+                                pdfViewer.Document?.Dispose();
+                                pdfViewer.Document = PdfDocument.Load(saveDlg.FileName);
                             }
                         }
                         else
                         {
-                            MessageBox.Show("Invalid input. Please enter a valid page number.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            MessageBox.Show("Invalid page number.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        MessageBox.Show("Failed to rotate page: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show("Invalid input. Please enter a valid page number.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Failed to rotate page: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
@@ -174,94 +158,65 @@ namespace PDF_Editor
 
         private void btnSearchText_Click(object sender, EventArgs e)
         {
-            if (pdfViewer.Document != null)
-            {
-                MessageBox.Show("Search functionality is not available in this version.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
+            if (pdfViewer.Document == null) 
+                return;
+            MessageBox.Show("Search functionality is not available in this version.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private void btnZoomFitWidth_Click(object sender, EventArgs e)
-        {
-            if (pdfViewer != null)
-            {
-                pdfViewer.ZoomMode = PdfViewerZoomMode.FitWidth;
-            }
-        }
+        private void btnZoomFitWidth_Click(object sender, EventArgs e) => pdfViewer?.ZoomMode = PdfViewerZoomMode.FitWidth;
 
-        private void btnZoomActualSize_Click(object sender, EventArgs e)
-        {
-            if (pdfViewer != null)
-            {
-                pdfViewer.ZoomMode = PdfViewerZoomMode.FitBest;
-            }
-        }
+        private void btnZoomActualSize_Click(object sender, EventArgs e) => pdfViewer?.ZoomMode = PdfViewerZoomMode.FitBest;
 
-        private void btnZoomFitHeight_Click(object sender, EventArgs e)
-        {
-            if (pdfViewer != null)
-            {
-                pdfViewer.ZoomMode = PdfViewerZoomMode.FitHeight;
-            }
-        }
+        private void btnZoomFitHeight_Click(object sender, EventArgs e) => pdfViewer?.ZoomMode = PdfViewerZoomMode.FitHeight;
 
         private void btnDeletePage_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog dlg = new OpenFileDialog())
+            using var dlg = new OpenFileDialog();
+            dlg.Filter = "PDF files (*.pdf)|*.pdf";
+            if (dlg.ShowDialog() != DialogResult.OK) 
+                return;
+
+            try
             {
-                dlg.Filter = "PDF files (*.pdf)|*.pdf";
-                if (dlg.ShowDialog() == DialogResult.OK)
+                var inputDocument = PdfReader.Open(dlg.FileName, PdfDocumentOpenMode.Modify);
+
+                // Minta user memasukkan nomor halaman yang mau dihapus
+                var inputPage = Microsoft.VisualBasic.Interaction.InputBox(
+                    "Enter page number to delete (1 - " + inputDocument.PageCount.ToString() + "):",
+                    "Delete Page");
+
+                if (int.TryParse(inputPage, out var pageNumber))
                 {
-                    try
+                    if (pageNumber >= 1 && pageNumber <= inputDocument.PageCount)
                     {
-                        // Buka file PDF yang dipilih
-                        PdfSharp.Pdf.PdfDocument inputDocument = PdfReader.Open(dlg.FileName, PdfDocumentOpenMode.Modify);
+                        // Hapus halaman (ingat: index mulai dari 0)
+                        inputDocument.Pages.RemoveAt(pageNumber - 1);
 
-                        // Minta user memasukkan nomor halaman yang mau dihapus
-                        string inputPage = Microsoft.VisualBasic.Interaction.InputBox(
-                            "Enter page number to delete (1 - " + inputDocument.PageCount.ToString() + "):",
-                            "Delete Page");
+                        using var saveDlg = new SaveFileDialog();
+                        saveDlg.Filter = "PDF files (*.pdf)|*.pdf";
+                        if (saveDlg.ShowDialog() != DialogResult.OK) 
+                            return;
 
-                        int pageNumber;
-                        if (int.TryParse(inputPage, out pageNumber))
-                        {
-                            if (pageNumber >= 1 && pageNumber <= inputDocument.PageCount)
-                            {
-                                // Hapus halaman (ingat: index mulai dari 0)
-                                inputDocument.Pages.RemoveAt(pageNumber - 1);
+                        inputDocument.Save(saveDlg.FileName);
+                        MessageBox.Show("Page deleted and file saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                                using (SaveFileDialog saveDlg = new SaveFileDialog())
-                                {
-                                    saveDlg.Filter = "PDF files (*.pdf)|*.pdf";
-                                    if (saveDlg.ShowDialog() == DialogResult.OK)
-                                    {
-                                        // Simpan hasil file baru
-                                        inputDocument.Save(saveDlg.FileName);
-                                        MessageBox.Show("Page deleted and file saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                                        // Reload hasil file baru ke viewer
-                                        pdfViewer.Document?.Dispose();
-                                        pdfViewer.Document = PdfiumViewer.PdfDocument.Load(saveDlg.FileName);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                MessageBox.Show("Invalid page number.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            }
-                        }
-                        else
-                        {
-                            MessageBox.Show("Invalid input. Please enter a valid page number.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        }
+                        pdfViewer.Document?.Dispose();
+                        pdfViewer.Document = PdfDocument.Load(saveDlg.FileName);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        MessageBox.Show("Failed to delete page: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show("Invalid page number.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
+                else
+                {
+                    MessageBox.Show("Invalid input. Please enter a valid page number.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to delete page: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-        
     }
 }
